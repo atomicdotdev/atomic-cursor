@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "command": "test -d .atomic && atomic agent hooks cursor session-start || true"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "test -d .atomic && atomic agent hooks cursor session-end || true"
+      }
+    ],
+    "beforeSubmitPrompt": [
+      {
+        "command": "test -d .atomic && atomic agent hooks cursor user-prompt-submit || true"
+      }
+    ],
+    "stop": [
+      {
+        "command": "test -d .atomic && atomic agent hooks cursor stop || true"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "test -d .atomic && atomic agent hooks cursor post-tool || true"
+      }
+    ],
+    "afterAgentThought": [
+      {
+        "command": "test -d .atomic && atomic agent hooks cursor after-thought || true"
+      }
+    ]
+  }
+}
