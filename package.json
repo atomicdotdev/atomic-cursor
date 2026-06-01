@@ -16,7 +16,7 @@
     "version-control"
   ],
   "files": [
-    "hooks.json",
+    "hooks/",
     "rules/",
     "skills/",
     "install.js",

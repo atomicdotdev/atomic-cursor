@@ -3,8 +3,11 @@
 /**
  * atomic-cursor install
  *
- * Installs Atomic hooks into ~/.cursor/hooks.json (via atomic CLI or manual merge)
- * and provides instructions for adding rules to projects.
+ * Registers Atomic hooks into ~/.cursor/hooks.json by delegating to
+ *   atomic agent enable --hooks hooks/cursor.atomic-hooks.json
+ * The manifest in this repo is the source of truth — when Cursor changes its
+ * hook schema you edit the manifest and re-publish; no `atomic` rebuild needed.
+ * The merge engine ships with `atomic` (no node/jq/sudo/extra runtime).
  *
  * Usage:
  *   npx atomic-cursor            # install from npm
@@ -13,97 +16,59 @@
  *   node install.js --uninstall  # remove hooks
  */
 
-const fs = require("fs");
 const path = require("path");
-const os = require("os");
 const { execSync } = require("child_process");
 
 const silent = process.argv.includes("--silent");
 const uninstall = process.argv.includes("--uninstall");
 
 const PKG_DIR = __dirname;
-const HOOKS_TARGET = path.join(os.homedir(), ".cursor", "hooks.json");
-const ATOMIC_PREFIX = "atomic agent hooks cursor";
+const MANIFEST = path.join(PKG_DIR, "hooks", "cursor.atomic-hooks.json");
 
 function tryExec(cmd) {
   try {
-    execSync(cmd, { stdio: "pipe" });
-    return true;
+    return execSync(cmd, { encoding: "utf8" });
   } catch {
-    return false;
+    return null;
   }
 }
 
-function readHooksJson(filePath) {
-  try {
-    if (!fs.existsSync(filePath)) return { version: 1, hooks: {} };
-    return JSON.parse(fs.readFileSync(filePath, "utf8"));
-  } catch {
-    return { version: 1, hooks: {} };
+function printProjectInstructions() {
+  console.log();
+  console.log("  To add Atomic rules + skills to a project:");
+  console.log("    mkdir -p .cursor/rules");
+  console.log(
+    `    cp ${path.join(PKG_DIR, "rules", "atomic.md")} .cursor/rules/atomic.md`,
+  );
+  for (const name of ["atomic-vault", "atomic-vcs", "code-intelligence"]) {
+    console.log(
+      `    cp ${path.join(PKG_DIR, "skills", name, "SKILL.md")} .cursor/rules/${name}.md`,
+    );
   }
-}
-
-function writeHooksJson(filePath, data) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(filePath, JSON.stringify(data, null, 2) + "\n");
-}
-
-function hasAtomicHook(hooks, eventName) {
-  const entries = hooks[eventName] || [];
-  return entries.some((e) => e.command && e.command.includes(ATOMIC_PREFIX));
+  console.log();
 }
 
 function doInstall() {
-  // Try atomic CLI first
-  const hasAtomic = tryExec("atomic --version");
-  if (hasAtomic) {
-    const installed = tryExec("atomic agent enable --agent cursor --global");
+  if (tryExec("atomic --version") === null) {
     if (!silent) {
-      if (installed) {
-        console.log("  hooks: installed via atomic CLI into ~/.cursor/hooks.json");
-      } else {
-        console.log("  hooks: atomic CLI install failed, trying manual merge");
-      }
+      console.warn("  hooks: skipped (atomic not found on PATH)");
+      console.warn(
+        `         after installing Atomic, run: atomic agent enable --hooks "${MANIFEST}"`,
+      );
     }
-
-    // Verify it worked
-    if (installed && fs.existsSync(HOOKS_TARGET)) {
-      const existing = readHooksJson(HOOKS_TARGET);
-      if (hasAtomicHook(existing.hooks || {}, "sessionStart")) {
-        if (!silent) {
-          console.log();
-          console.log("✓ atomic-cursor installed");
-          printProjectInstructions();
-        }
-        return;
-      }
+  } else {
+    const out = tryExec(`atomic agent enable --hooks "${MANIFEST}"`);
+    if (!silent) {
+      if (out) process.stdout.write(out);
+      console.log(
+        out
+          ? "  hooks: registered via atomic agent enable --hooks → ~/.cursor/hooks.json"
+          : "  hooks: enable failed (see output above)",
+      );
     }
-  }
-
-  // Manual merge fallback
-  const source = readHooksJson(path.join(PKG_DIR, "hooks.json"));
-  const target = readHooksJson(HOOKS_TARGET);
-
-  if (!target.hooks) target.hooks = {};
-  let added = 0;
-
-  for (const [event, entries] of Object.entries(source.hooks || {})) {
-    if (!target.hooks[event]) target.hooks[event] = [];
-    for (const entry of entries) {
-      if (!target.hooks[event].some((e) => e.command.includes(ATOMIC_PREFIX))) {
-        target.hooks[event].push(entry);
-        added++;
-      }
-    }
-  }
-
-  if (added > 0) {
-    writeHooksJson(HOOKS_TARGET, target);
   }
 
   if (!silent) {
-    console.log(`  hooks: ${added > 0 ? `merged ${added} hooks` : "already installed"} in ~/.cursor/hooks.json`);
     console.log();
     console.log("✓ atomic-cursor installed");
     printProjectInstructions();
@@ -111,46 +76,17 @@ function doInstall() {
 }
 
 function doUninstall() {
-  // Try atomic CLI first
-  const hasAtomic = tryExec("atomic --version");
-  if (hasAtomic) {
-    tryExec("atomic agent disable --agent cursor --global");
+  if (tryExec("atomic --version") !== null) {
+    const out = tryExec(`atomic agent disable --hooks "${MANIFEST}"`);
+    if (!silent && out) process.stdout.write(out);
   }
-
-  // Also do manual removal
-  if (fs.existsSync(HOOKS_TARGET)) {
-    const target = readHooksJson(HOOKS_TARGET);
-    let removed = 0;
-
-    for (const event of Object.keys(target.hooks || {})) {
-      const before = target.hooks[event].length;
-      target.hooks[event] = target.hooks[event].filter(
-        (e) => !e.command || !e.command.includes(ATOMIC_PREFIX)
-      );
-      removed += before - target.hooks[event].length;
-      if (target.hooks[event].length === 0) delete target.hooks[event];
-    }
-
-    if (removed > 0) writeHooksJson(HOOKS_TARGET, target);
-
-    if (!silent) {
-      console.log(`  hooks: removed ${removed} hooks from ~/.cursor/hooks.json`);
-    }
-  }
-
   if (!silent) {
     console.log();
     console.log("✓ atomic-cursor uninstalled");
-    console.log("  Note: .cursor/rules/atomic.md in projects must be removed manually.");
+    console.log(
+      "  Note: .cursor/rules/ files in projects must be removed manually.",
+    );
   }
-}
-
-function printProjectInstructions() {
-  console.log();
-  console.log("  To add Atomic rules to a project:");
-  console.log("    mkdir -p .cursor/rules");
-  console.log(`    cp ${path.join(PKG_DIR, "rules", "atomic.md")} .cursor/rules/atomic.md`);
-  console.log();
 }
 
 if (uninstall) {

@@ -30,8 +30,8 @@ npx atomic-cursor
 
 ### What install does
 
-1. **Hooks** — installs hook entries into `~/.cursor/hooks.json` (fires `atomic agent hooks cursor <verb>` on lifecycle events)
-2. **Rules** — must be copied to each project's `.cursor/rules/` directory manually
+1. **Hooks** — runs `atomic agent enable --hooks hooks/cursor.atomic-hooks.json` to merge hook entries into `~/.cursor/hooks.json` (fires `atomic agent hooks cursor <verb>`). The hook definitions live in this repo's manifest, so updating Cursor's hook wiring never requires rebuilding `atomic`.
+2. **Rules & skills** — must be copied to each project's `.cursor/rules/` directory manually (`atomic.md` plus the three skills)
 
 ### Add rules to a project
 
@@ -82,16 +82,17 @@ atomic agent attest
 
 | File | Purpose |
 |------|---------|
-| `hooks.json` | Hooks config — merged into `~/.cursor/hooks.json` |
+| `hooks/cursor.atomic-hooks.json` | Hook manifest (source of truth) — merged into `~/.cursor/hooks.json` by `atomic agent enable --hooks` |
 | `rules/atomic.md` | Agent rules — copy to `.cursor/rules/` in each project |
 | `skills/atomic-vault/SKILL.md` | Vault reference (goals, intents, memory) |
+| `skills/atomic-vcs/SKILL.md` | VCS inspection (status, log, change `-p`/`-a`, diff) |
 | `skills/code-intelligence/SKILL.md` | Knowledge graph query patterns |
-| `install.js` | Installs hooks into `~/.cursor/hooks.json` |
-| `install.sh` | Development install |
+| `install.js` | Registers hooks via `atomic agent enable --hooks` |
+| `install.sh` | Development install (same step) |
 
 ## How hooks work
 
-Cursor reads hooks from `.cursor/hooks.json`. The Atomic hooks call back to `atomic agent hooks cursor <verb>`:
+Cursor reads hooks from `.cursor/hooks.json`. This package ships the hook definitions in `hooks/cursor.atomic-hooks.json`; `atomic agent enable --hooks` merges them in (idempotently, preserving non-Atomic hooks). They call back to `atomic agent hooks cursor <verb>`:
 
 ```
 Cursor session start
@@ -121,7 +122,7 @@ npx atomic-cursor --uninstall
 Or manually:
 
 ```bash
-atomic agent disable --agent cursor --global
+atomic agent disable --hooks /path/to/atomic-cursor/hooks/cursor.atomic-hooks.json
 ```
 
 Rules files in project `.cursor/rules/` must be removed manually.
