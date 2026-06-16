@@ -79,7 +79,7 @@ How to verify the work is correct.
 Any additional context, decisions, or open questions.
 ```
 
-After editing intent markdown files, run `atomic vault sync` to persist changes back to the vault database, and **always sync before `atomic vault intent show`/`update`**. The CLI reads from the database, not the file: an unsynced `show` renders the stale placeholder template, and `update` re-materializes the database copy over the file, clobbering your edits. `atomic vault sync` is not `atomic record` — it only moves your `.vault/` edits into the database — and you must run it even though hooks handle recording.
+After editing an intent file, run `atomic vault sync` to persist your changes to the vault database. The CLI reads `show`/`update`/`list` from the database, not the file — so sync **before** every `show` and `update`, or `show` will render the stale placeholder and `update` will re-materialize the database copy over your edits, clobbering them. (`atomic vault sync` is not `atomic record` — hooks handle recording; you still run `sync`.)
 
 ## Full Workflow (End to End)
 
@@ -108,9 +108,24 @@ atomic vault goal start "auth-implementation"
 atomic vault intent link <intent-id> --goal auth-implementation
 ```
 
-### 4. Do the work
+### 4. Do the work and check off TODOs as you go
 
-Write code and iterate. You do **not** create or switch views, and you do **not** run `atomic add` or `atomic record` — the Cursor integration's hooks own all of that:
+Write code and iterate. As each TODO is completed, verify it meets its criteria, then mark it done in the intent file using your **file editing tool** (not Python, not bash, not sed — use the agent's native edit capability):
+
+```
+# In the intent file, change:
+- [ ] `PROJ-1/1` Scaffold package.json
+# to:
+- [x] `PROJ-1/1` Scaffold package.json
+```
+
+Also check off the corresponding acceptance criteria when all criteria for that TODO are satisfied. After every edit to the intent file, run `atomic vault sync` to persist to the database.
+
+**Verify before checking off.** Run the actual commands or tests that prove the TODO is done. Do not mark a TODO complete speculatively.
+
+**Never use Python, bash scripts, or sed to edit intent files.** Use your agent's native file editing tool. Raw file manipulation bypasses the vault's integrity guarantees.
+
+You do **not** create or switch views, and you do **not** run `atomic add` or `atomic record` — the integration's hooks own all of that:
 
 - **Session start** forks a draft view from your current view and switches into it automatically (a haikunator-named view, e.g. `early-ridge-ffd9`). Your whole session runs inside it.
 - **Turn end** records automatically — the hook runs `status` → `add` (tracks new files) → `record --all` with full AI provenance (model, tokens, cost, session, decision graph).
@@ -118,12 +133,20 @@ Write code and iterate. You do **not** create or switch views, and you do **not*
 
 To review what the hooks recorded (diff, provenance, AI attestation), use the `atomic-vcs` skill: `atomic log -f oneline`, then `atomic change -p -a`.
 
-### 5. Update intent status
+### 5. Complete the intent
 
-```bash
-atomic vault sync                                  # persist file edits first
-atomic vault intent update <id> --status review
-```
+When all TODOs are checked off:
+
+1. **Verify** every acceptance criterion by running the actual commands/tests.
+2. **Check off** all acceptance criteria in the intent file using your file editing tool.
+3. **Sync** to persist your edits:
+   ```bash
+   atomic vault sync
+   ```
+4. **Mark done:**
+   ```bash
+   atomic vault intent update <id> --status done
+   ```
 
 Always `atomic vault sync` before `intent update` — `update` re-materializes the database copy over the file, so an unsynced update discards your edits.
 
@@ -158,5 +181,5 @@ atomic vault goal resume "auth-implementation"
 - One intent per unit of work — keep them focused
 - Start every session by checking `atomic vault intent list` and `atomic vault goal list`
 - Fill in the intent markdown completely before starting implementation
-- Use `atomic vault sync` after editing any vault markdown files, and before every `show`/`update` (the CLI reads the database, not the file, so an unsynced `update` clobbers your edits)
+- Run `atomic vault sync` after editing any vault markdown file, and before every `show`/`update`
 - You don't manage views or recording — hooks fork a draft view at session start, record at turn end, and restore your view at session end. Inspect the results with the `atomic-vcs` skill.
