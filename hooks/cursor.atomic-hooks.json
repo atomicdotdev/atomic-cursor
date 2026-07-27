@@ -4,22 +4,22 @@
   "command_prefix": "atomic agent hooks cursor",
   "hooks": {
     "sessionStart": [
-      { "command": "test -d .atomic && atomic agent hooks cursor session-start || true" }
+      { "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks cursor session-start || true" }
     ],
     "sessionEnd": [
-      { "command": "test -d .atomic && atomic agent hooks cursor session-end || true" }
+      { "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks cursor session-end || true" }
     ],
     "beforeSubmitPrompt": [
-      { "command": "test -d .atomic && atomic agent hooks cursor user-prompt-submit || true" }
+      { "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks cursor user-prompt-submit || true" }
     ],
     "stop": [
-      { "command": "test -d .atomic && atomic agent hooks cursor stop || true" }
+      { "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks cursor stop || true" }
     ],
     "postToolUse": [
-      { "command": "test -d .atomic && atomic agent hooks cursor post-tool || true" }
+      { "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks cursor post-tool || true" }
     ],
     "afterAgentThought": [
-      { "command": "test -d .atomic && atomic agent hooks cursor after-thought || true" }
+      { "command": "test -d .atomic || test -f .atomic-sandbox && atomic agent hooks cursor after-thought || true" }
     ]
   },
   "merge": {
